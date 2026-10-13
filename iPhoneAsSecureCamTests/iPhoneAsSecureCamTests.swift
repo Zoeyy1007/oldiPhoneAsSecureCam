@@ -22,15 +22,19 @@ struct iPhoneAsSecureCamTests {
             batteryState: "charging",
             thermalState: "nominal",
             screenBrightness: 0.1,
+            cameraRunning: true,
             capturedFrames: 123,
             droppedFrames: 2,
             measuredFPS: 9.8,
+            cameraISO: 80,
+            exposureDurationMilliseconds: 8.333,
+            cameraStartLatencyMilliseconds: 245.2,
             event: "message, with \"quotes\""
         )
 
         #expect(sample.csvRow.contains("\"message, with \"\"quotes\"\"\""))
         #expect(sample.csvRow.contains(",72,charging,nominal,"))
-        #expect(sample.csvRow.contains(",123,2,9.80,"))
+        #expect(sample.csvRow.contains(",true,123,2,9.80,80.0,8.333,245.2,"))
     }
 
 }

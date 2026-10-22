@@ -102,9 +102,13 @@ struct TelemetrySample: Codable, Equatable {
     let batteryState: String
     let thermalState: String
     let screenBrightness: Double
+    let cameraRunning: Bool
     let capturedFrames: Int
     let droppedFrames: Int
     let measuredFPS: Double?
+    let cameraISO: Float?
+    let exposureDurationMilliseconds: Double?
+    let cameraStartLatencyMilliseconds: Double?
     let event: String?
 
     static let csvHeader = [
@@ -116,14 +120,27 @@ struct TelemetrySample: Codable, Equatable {
         "battery_state",
         "thermal_state",
         "screen_brightness",
+        "camera_running",
         "captured_frames",
         "dropped_frames",
         "measured_fps",
+        "camera_iso",
+        "exposure_duration_ms",
+        "camera_start_latency_ms",
         "event"
     ].joined(separator: ",")
 
     var csvRow: String {
-        [
+        let cameraFields = [
+            String(cameraRunning),
+            String(capturedFrames),
+            String(droppedFrames),
+            measuredFPS.map { String(format: "%.2f", $0) } ?? "",
+            cameraISO.map { String(format: "%.1f", $0) } ?? "",
+            exposureDurationMilliseconds.map { String(format: "%.3f", $0) } ?? "",
+            cameraStartLatencyMilliseconds.map { String(format: "%.1f", $0) } ?? ""
+        ]
+        let fields = [
             runID.uuidString,
             scenario.rawValue,
             TelemetryDateFormatter.string(from: timestamp),
@@ -131,14 +148,9 @@ struct TelemetrySample: Codable, Equatable {
             batteryPercent.map(String.init) ?? "",
             batteryState,
             thermalState,
-            String(format: "%.3f", screenBrightness),
-            String(capturedFrames),
-            String(droppedFrames),
-            measuredFPS.map { String(format: "%.2f", $0) } ?? "",
-            event ?? ""
-        ]
-        .map(Self.escapeCSVField)
-        .joined(separator: ",")
+            String(format: "%.3f", screenBrightness)
+        ] + cameraFields + [event ?? ""]
+        return fields.map(Self.escapeCSVField).joined(separator: ",")
     }
 
     nonisolated private static func escapeCSVField(_ value: String) -> String {

@@ -83,6 +83,21 @@ struct ContentView: View {
                         color: controller.cameraMetrics.droppedFrames == 0 ? .green : .orange
                     )
                 }
+
+                HStack(spacing: 12) {
+                    MetricCard(
+                        title: "Exposure",
+                        value: exposureText,
+                        detail: controller.cameraExposure.map { "ISO \(Int($0.iso.rounded()))" } ?? "Waiting for camera",
+                        color: .purple
+                    )
+                    MetricCard(
+                        title: "Camera start",
+                        value: controller.cameraStartLatencyMilliseconds.map { String(format: "%.0f ms", $0) } ?? "—",
+                        detail: "Latest start latency",
+                        color: .blue
+                    )
+                }
             }
 
             Text(controller.statusMessage)
@@ -315,6 +330,11 @@ struct ContentView: View {
             return "Collecting rate…"
         }
         return String(format: "%+.1f%%/hr", rate)
+    }
+
+    private var exposureText: String {
+        guard let exposure = controller.cameraExposure else { return "—" }
+        return String(format: "%.2f ms", exposure.durationSeconds * 1_000)
     }
 
     private func thermalLabel(for level: Int) -> String {

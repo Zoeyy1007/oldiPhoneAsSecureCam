@@ -27,6 +27,8 @@ final class CapabilityTestController: ObservableObject {
     @Published private(set) var chartPoints: [RunChartPoint] = []
     @Published private(set) var cameraMetrics = CameraMetrics.zero
     @Published private(set) var measuredFPS: Double?
+    @Published private(set) var cameraExposure: CameraExposure?
+    @Published private(set) var cameraStartLatencyMilliseconds: Double?
 
     let batteryMonitor: BatteryMonitor
     let thermalMonitor: ThermalMonitor
@@ -68,6 +70,11 @@ final class CapabilityTestController: ObservableObject {
 
         thermalMonitor.onStateChange = { [weak self] state in
             self?.handleThermalStateChange(state)
+        }
+        cameraEngine.setEventHandler { event in
+            Task { @MainActor [weak self] in
+                self?.handleCameraEvent(event)
+            }
         }
     }
 
@@ -145,6 +152,8 @@ final class CapabilityTestController: ObservableObject {
         chartPoints = []
         cameraMetrics = .zero
         measuredFPS = nil
+        cameraExposure = nil
+        cameraStartLatencyMilliseconds = nil
         previousFrameSample = nil
         seriousThermalStateStartedAt = thermalMonitor.state == .serious ? startedAt : nil
         isRunning = true
@@ -245,7 +254,10 @@ final class CapabilityTestController: ObservableObject {
         guard let runID, let startedAt else { return }
 
         let sampleElapsed = Date().timeIntervalSince(startedAt)
-        cameraMetrics = cameraEngine.metricsSnapshot()
+        let cameraSnapshot = cameraEngine.snapshot()
+        cameraMetrics = cameraSnapshot.metrics
+        cameraExposure = cameraSnapshot.exposure
+        cameraStartLatencyMilliseconds = cameraSnapshot.lastStartLatencyMilliseconds
         if let previousFrameSample,
            sampleElapsed > previousFrameSample.elapsed {
             measuredFPS = Double(cameraMetrics.capturedFrames - previousFrameSample.count)
@@ -274,9 +286,13 @@ final class CapabilityTestController: ObservableObject {
             batteryState: batteryMonitor.state.telemetryName,
             thermalState: thermalMonitor.state.telemetryName,
             screenBrightness: UIScreen.main.brightness,
+            cameraRunning: cameraSnapshot.isRunning,
             capturedFrames: cameraMetrics.capturedFrames,
             droppedFrames: cameraMetrics.droppedFrames,
             measuredFPS: measuredFPS,
+            cameraISO: cameraExposure?.iso,
+            exposureDurationMilliseconds: cameraExposure.map { $0.durationSeconds * 1_000 },
+            cameraStartLatencyMilliseconds: cameraStartLatencyMilliseconds,
             event: event
         )
 
@@ -307,15 +323,36 @@ final class CapabilityTestController: ObservableObject {
 
         Task {
             do {
-                try await cameraEngine.start(framesPerSecond: framesPerSecond)
+                try await cameraEngine.start(
+                    configuration: .hd720p(framesPerSecond: framesPerSecond)
+                )
                 guard isRunning, runID == expectedRunID else {
                     cameraEngine.stop()
                     return
                 }
-                record(event: "camera_started: 720p/\(framesPerSecond)_fps")
             } catch {
                 stopTest(reason: "Camera failed: \(error.localizedDescription)")
             }
+        }
+    }
+
+    private func handleCameraEvent(_ event: CameraEvent) {
+        guard isRunning else { return }
+
+        switch event {
+        case .started(let latencyMilliseconds):
+            record(event: String(format: "camera_started: latency_ms=%.1f", latencyMilliseconds))
+        case .stopped:
+            record(event: "camera_stopped")
+        case .interrupted(let reason):
+            statusMessage = "Camera interrupted: \(reason)"
+            record(event: "camera_interrupted: \(reason)")
+        case .interruptionEnded:
+            statusMessage = "Recording \(selectedScenario.rawValue)"
+            record(event: "camera_interruption_ended")
+        case .runtimeError(let message):
+            statusMessage = "Camera error: \(message)"
+            record(event: "camera_runtime_error: \(message)")
         }
     }
 

@@ -1,5 +1,7 @@
 # iPhone 8 Camera Capability Test Plan
 
+The phone-to-phone discovery, streaming, viewer UI, and connection lifecycle are specified separately in [`CONNECTION_IMPLEMENTATION_PLAN.md`](CONNECTION_IMPLEMENTATION_PLAN.md). This document remains the authority for measurement and thermal-safety testing.
+
 ## Purpose
 
 Before building a complete security-camera product, measure whether this particular iPhone 8 can operate safely and reliably in three modes:
